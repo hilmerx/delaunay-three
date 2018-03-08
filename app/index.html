@@ -148,22 +148,23 @@
         light2.position.set( 50, 50, 50 );
         scene.add( light2 );
 
-      triangles.forEach(tri => {
-        makeTriangle(tri)
-        // console.log(tri);
-      })
-      let test = [{x:0,y:1},{x:0,y:0},{x:1,y:1}]
+      // triangles.forEach(tri => {
+      //   makeTriangle(tri)
+      //   // console.log(tri);
+      // })
+      // let test = [{x:0,y:1},{x:0,y:0},{x:1,y:1}]
 
 
 
       var geometry = new THREE.BoxGeometry(1,1,2);
       var material = new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff});
       var cube = new THREE.Mesh(geometry, material);
-      // scene.add(cube);
+      scene.add(cube);
 
-      camera.position.z = 2000;
+      camera.position.z = 30
+        // camera.position.set( 0, 10, 30 );
+
       var render = function () {
-        // camera.position.set( 0, 20, 100 );
         controls.update();
 
       requestAnimationFrame(render);
