@@ -412,11 +412,11 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 
 
 __WEBPACK_IMPORTED_MODULE_1_three__["OrbitControls"] = __webpack_require__(5)(__WEBPACK_IMPORTED_MODULE_1_three__);
-let canvas = document.getElementById('canvas1');
+let canvas1 = document.getElementById('canvas1');
 let canvas2 = document.getElementById('canvas2');
 
 var noise = new __WEBPACK_IMPORTED_MODULE_2_noisejs__["Noise"](Math.random());
-let circularWeb = new __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__["a" /* default */](25, canvas);
+let circularWeb = new __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__["a" /* default */](25, canvas2);
 
 class SceneManager {
     constructor() {
@@ -425,7 +425,7 @@ class SceneManager {
         this.camera = new __WEBPACK_IMPORTED_MODULE_1_three__["PerspectiveCamera"](35, window.innerWidth / window.innerHeight, 0.1, 3000);
 
         this.controls = new __WEBPACK_IMPORTED_MODULE_1_three__["OrbitControls"](this.camera);
-        this.renderer = new __WEBPACK_IMPORTED_MODULE_1_three__["WebGLRenderer"]({ canvas: document.getElementById('canvas2'), anitalias: true });
+        this.renderer = new __WEBPACK_IMPORTED_MODULE_1_three__["WebGLRenderer"]({ canvas: canvas1, anitalias: true });
 
         this.update();
     }
@@ -438,32 +438,37 @@ class SceneManager {
     }
 }
 
-let sceneManager = new SceneManager();
+let scene = new SceneManager();
 
-function makeTriangle(tri) {
-    var off = -500;
-    var meshMaterial = new __WEBPACK_IMPORTED_MODULE_1_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff });
+// function makeTriangle(tri){
+//     var off = -500
+//     var meshMaterial = new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff});
 
-    var geom = new __WEBPACK_IMPORTED_MODULE_1_three__["Geometry"]();
-    var v1 = new __WEBPACK_IMPORTED_MODULE_1_three__["Vector3"](tri[0].x + off, tri[0].y + off, tri[0].z);
-    var v2 = new __WEBPACK_IMPORTED_MODULE_1_three__["Vector3"](tri[1].x + off, tri[1].y + off, tri[1].z);
-    var v3 = new __WEBPACK_IMPORTED_MODULE_1_three__["Vector3"](tri[2].x + off, tri[2].y + off, tri[2].z);
+//     var geom = new THREE.Geometry(); 
+//     var v1 = new THREE.Vector3(tri[0].x + off,tri[0].y + off, tri[0].z);
+//     var v2 = new THREE.Vector3(tri[1].x + off,tri[1].y + off, tri[1].z);
+//     var v3 = new THREE.Vector3(tri[2].x + off,tri[2].y + off, tri[2].z);
 
-    geom.vertices.push(v1);
-    geom.vertices.push(v2);
-    geom.vertices.push(v3);
 
-    geom.faces.push(new __WEBPACK_IMPORTED_MODULE_1_three__["Face3"](0, 1, 2));
+//     geom.vertices.push(v1);
+//     geom.vertices.push(v2);
+//     geom.vertices.push(v3);
 
-    var object = new __WEBPACK_IMPORTED_MODULE_1_three__["Mesh"](geom, meshMaterial);
-    object.doubleSided = true;
-    scene.add(object);
-}
 
-triangles.forEach(tri => {
-    makeTriangle(tri);
-    // console.log(tri);
-});
+//     geom.faces.push( new THREE.Face3( 0, 1, 2 ) );
+
+
+//     var object = new THREE.Mesh( geom, meshMaterial);
+//     object.doubleSided = true;
+//     scene.add(object);
+// }
+
+
+// triangles.forEach(tri => {
+//     makeTriangle(tri)
+//     // console.log(tri);
+// })
+
 
 /*
         var render = function () {
@@ -524,13 +529,19 @@ triangles.forEach(tri => {
         })*/
 
 var light1 = new __WEBPACK_IMPORTED_MODULE_1_three__["AmbientLight"](0x888888);
-scene.add(light1);
+scene.scene.add(light1);
 
 var light2 = new __WEBPACK_IMPORTED_MODULE_1_three__["PointLight"](0xffffff, 1, 100);
 light2.position.set(50, 50, 50);
-scene.add(light2);
+scene.scene.add(light2);
 
-camera.position.z = 2000;
+scene.camera.position.z = 300;
+
+var geometry = new __WEBPACK_IMPORTED_MODULE_1_three__["BoxGeometry"](1, 1, 2);
+var material = new __WEBPACK_IMPORTED_MODULE_1_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff });
+var cube = new __WEBPACK_IMPORTED_MODULE_1_three__["Mesh"](geometry, material);
+scene.scene.add(cube);
+scene.update();
 
 /***/ }),
 /* 2 */
