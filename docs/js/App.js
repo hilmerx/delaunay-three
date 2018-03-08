@@ -5,6 +5,9 @@ let canvas2 = document.getElementById('canvas2')
 
 
 Promise.all([
+
+    //mänden vetices som laddas
+
     loadScene(74)
 ]).then(([master])=>{
 

@@ -46350,7 +46350,11 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 let canvas1 = document.getElementById('canvas1');
 let canvas2 = document.getElementById('canvas2');
 
-Promise.all([Object(__WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__["a" /* loadScene */])(74)]).then(([master]) => {
+Promise.all([
+
+//mänden vetices som laddas
+
+Object(__WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__["a" /* loadScene */])(74)]).then(([master]) => {
 
     function render() {
         requestAnimationFrame(render);
