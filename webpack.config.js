@@ -1,10 +1,10 @@
 const path = require('path');
 
 module.exports = {
-    entry: './app/js/App.js',
+    entry: './docs/js/App.js',
     output: {
         filename: 'App.js',
-        path: path.resolve(__dirname, 'app/temp/js')
+        path: path.resolve(__dirname, 'docs/temp/js')
     },
     module: {
     // Special compilation rules
