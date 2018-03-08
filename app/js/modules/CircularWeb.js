@@ -34,6 +34,7 @@ export default class CircularWeb {
     }
 
     draw(canvas){
+        console.log(canvas)
         let ctx = canvas.getContext('2d')
 
         for(this.i = this.triangles1D.length; this.i; ) {

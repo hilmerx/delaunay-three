@@ -11,6 +11,12 @@ export default class SceneManager {
         this.renderer = new THREE.WebGLRenderer({canvas: canvas1, anitalias: true})
         this.entities = []
         this.lights = []
+
+
+        this.renderer.setClearColor(0xeefff999)
+        this.renderer.setPixelRatio(window.devicePixelRatio)
+        this.renderer.setSize(window.innerWidth, window.innerHeight)
+
         this.update()
     }
 

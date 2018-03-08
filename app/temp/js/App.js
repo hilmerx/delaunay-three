@@ -46344,180 +46344,93 @@ function LensFlare() {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__modules_SceneManager_js__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_three__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_noisejs__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_noisejs___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_noisejs__);
-
-
-
-
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__ = __webpack_require__(3);
 
 
 let canvas1 = document.getElementById('canvas1');
 let canvas2 = document.getElementById('canvas2');
 
-var noise = new __WEBPACK_IMPORTED_MODULE_4_noisejs__["Noise"](Math.random());
-let circularWeb = new __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__["a" /* default */](25, canvas2);
+Promise.all([Object(__WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__["a" /* loadScene */])(74)]).then(([master]) => {
 
-let master = new __WEBPACK_IMPORTED_MODULE_1__modules_SceneManager_js__["a" /* default */]();
-master.camera.position.z = 20;
-
-let light1 = {
-    type: new __WEBPACK_IMPORTED_MODULE_3_three__["AmbientLight"](0x888888),
-    pos: [50, 50, 50]
-};
-master.addLight(light1);
-
-let light2 = {
-    type: new __WEBPACK_IMPORTED_MODULE_3_three__["PointLight"](0xffffff, 1, 100),
-    pos: [50, 50, 50]
-};
-master.addLight(light2);
-
-function render() {
-    requestAnimationFrame(render);
-    master.update();
-}
-render();
-
-//first box
-
-
-let entity = {
-    geometry: new __WEBPACK_IMPORTED_MODULE_3_three__["BoxGeometry"](1, 1, 2),
-    material: new __WEBPACK_IMPORTED_MODULE_3_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff })
-};
-
-let boxSpin = new __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__["a" /* default */](entity);
-
-boxSpin.addTrait(mesh => {
-    mesh.rotation.x += 0.01;
-    mesh.rotation.y += 0.001;
-});
-
-master.addEntity(boxSpin);
-master.update();
-
-//second box
-
-let entity2 = {
-    geometry: new __WEBPACK_IMPORTED_MODULE_3_three__["BoxGeometry"](2, 1, 2),
-    material: new __WEBPACK_IMPORTED_MODULE_3_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff })
-};
-
-let boxSpin2 = new __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__["a" /* default */](entity2);
-
-boxSpin2.addTrait(mesh => {
-    mesh.rotation.x += 0.02;
-    mesh.rotation.y += 0.001;
-});
-boxSpin2.set(3, 0, 0);
-master.addEntity(boxSpin2);
-
-function makeTriangle(tri) {
-    var off = -500;
-    var meshMaterial = new __WEBPACK_IMPORTED_MODULE_3_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff });
-
-    var geom = new __WEBPACK_IMPORTED_MODULE_3_three__["Geometry"]();
-    var v1 = new __WEBPACK_IMPORTED_MODULE_3_three__["Vector3"](tri[0].x + off, tri[0].y + off, tri[0].z);
-    var v2 = new __WEBPACK_IMPORTED_MODULE_3_three__["Vector3"](tri[1].x + off, tri[1].y + off, tri[1].z);
-    var v3 = new __WEBPACK_IMPORTED_MODULE_3_three__["Vector3"](tri[2].x + off, tri[2].y + off, tri[2].z);
-
-    geom.vertices.push(v1);
-    geom.vertices.push(v2);
-    geom.vertices.push(v3);
-
-    geom.faces.push(new __WEBPACK_IMPORTED_MODULE_3_three__["Face3"](0, 1, 2));
-
-    var object = new __WEBPACK_IMPORTED_MODULE_3_three__["Mesh"](geom, meshMaterial);
-    object.doubleSided = true;
-    scene.add(object);
-
-    let entityBufferSettings = {
-        geometry: geom,
-        material: meshMaterial
-    };
-
-    let entBuffer = new __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__["a" /* default */](entityBufferSettings);
-
-    master.addEntity(entBuffer);
-}
-
-//     makeTriangle(tri)
-
-// triangles.forEach(tri => {
-//     makeTriangle(tri)
-//     // console.log(tri);
-// })
-
-
-/*
-        var render = function () {
-        // camera.position.set( 0, 20, 100 );
-        controls.update();
-
+    function render() {
         requestAnimationFrame(render);
-            renderer.render(scene, camera);
-        }
-        render();
-
-*/
-
-/*
-
-        let vertPairs = []
-        vertices.forEach(v=>{ 
-            vertPairs.push({
-                x:v[0],
-                y:v[1],
-                matches: []
-            })
-        })
-
-        vertPairs.forEach(v => {
-            for (var i = 0; i < triangles.length; i++) {
-                for (var j = 0; j < triangles[i].length; j++) {
-                    if(v.x === triangles[i][j].x && v.y === triangles[i][j].y){
-                        v.matches.push([i, j])
-                    }
-                }
-            }
-        })
-
-
-
-        function makeZ(){
-            vertPairs.forEach(vert =>{
-                let div, z
-                div = 400
-                z = noise.perlin2(vert.x / div, vert.y / div) * 100
-                div = 800
-                z = noise.perlin2(vert.x / div, vert.y / div) * 200 + z
-                div = 150
-                z = noise.perlin2(vert.x / div, vert.y / div) * 50 + z
-                vert.matches.forEach(m=>{
-                    triangles[m[0]][m[1]].z = z
-                })
-            })
-        }
-        // makeZ()
-
-        triangles.forEach(tri => {
-            tri.forEach(vert => {
-                let div = 300
-                vert.z = noise.perlin2(vert.x / div, vert.y / div) * 100
-            })
-        })*/
+        master.update();
+    }
+    render();
+});
 
 /***/ }),
 /* 3 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Delaunay_js__ = __webpack_require__(4);
+/* harmony export (immutable) */ __webpack_exports__["a"] = loadScene;
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__CircularWeb_js__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__SceneManager_js__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_three__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Entity_js__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Logic_js__ = __webpack_require__(10);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_noisejs__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_noisejs___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_noisejs__);
+
+
+
+
+
+
+
+function loadScene(verts) {
+
+    //Make triangle calculation
+    var noise = new __WEBPACK_IMPORTED_MODULE_5_noisejs__["Noise"](Math.random());
+    let circularWeb = new __WEBPACK_IMPORTED_MODULE_0__CircularWeb_js__["a" /* default */](verts, canvas2);
+
+    //Init scene
+    let master = new __WEBPACK_IMPORTED_MODULE_1__SceneManager_js__["a" /* default */](canvas1);
+    master.camera.position.z = 2000;
+
+    //Lights
+    let light1 = {
+        type: new __WEBPACK_IMPORTED_MODULE_2_three__["AmbientLight"](0x888888),
+        pos: [50, 50, 50]
+    };
+    master.addLight(light1);
+
+    let light2 = {
+        type: new __WEBPACK_IMPORTED_MODULE_2_three__["PointLight"](0xffffff, 1, 100),
+        pos: [50, 50, 50]
+    };
+    master.addLight(light2);
+
+    //Triangles
+    let triangles = circularWeb.triangles;
+    triangles.forEach(tri => {
+        let bufferSettings = Object(__WEBPACK_IMPORTED_MODULE_4__Logic_js__["a" /* spawnTriangle */])(tri, new __WEBPACK_IMPORTED_MODULE_2_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff }));
+
+        let triBuffer = new __WEBPACK_IMPORTED_MODULE_3__Entity_js__["a" /* default */](bufferSettings);
+        master.addEntity(triBuffer);
+    });
+
+    //Create Perlin-noise terrain
+
+    master.entities.forEach(mesh => {
+        let tri = mesh.mesh.geometry.vertices;
+        let div = 200;
+        let height = 200;
+        tri.forEach(v => {
+            v.z = noise.perlin2(v.x / div, v.y / div) * height;
+        });
+    });
+
+    return master;
+}
+
+/***/ }),
+/* 4 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Delaunay_js__ = __webpack_require__(5);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_noisejs__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_noisejs___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_noisejs__);
 
@@ -46554,6 +46467,7 @@ class CircularWeb {
     }
 
     draw(canvas) {
+        console.log(canvas);
         let ctx = canvas.getContext('2d');
 
         for (this.i = this.triangles1D.length; this.i;) {
@@ -46587,7 +46501,7 @@ class CircularWeb {
 
 
 /***/ }),
-/* 4 */
+/* 5 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -46831,13 +46745,13 @@ class DelaunayClass {
 
 
 /***/ }),
-/* 5 */
+/* 6 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_three__ = __webpack_require__(0);
 
-__WEBPACK_IMPORTED_MODULE_0_three__["OrbitControls"] = __webpack_require__(6)(__WEBPACK_IMPORTED_MODULE_0_three__);
+__WEBPACK_IMPORTED_MODULE_0_three__["OrbitControls"] = __webpack_require__(7)(__WEBPACK_IMPORTED_MODULE_0_three__);
 
 class SceneManager {
     constructor() {
@@ -46849,6 +46763,11 @@ class SceneManager {
         this.renderer = new __WEBPACK_IMPORTED_MODULE_0_three__["WebGLRenderer"]({ canvas: canvas1, anitalias: true });
         this.entities = [];
         this.lights = [];
+
+        this.renderer.setClearColor(0xeefff999);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+
         this.update();
     }
 
@@ -46884,7 +46803,7 @@ class SceneManager {
 
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports) {
 
 module.exports = function( THREE ) {
@@ -47910,11 +47829,11 @@ module.exports = function( THREE ) {
 
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Vec3__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Vec3__ = __webpack_require__(9);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_three__ = __webpack_require__(0);
 
 
@@ -47955,7 +47874,7 @@ class Entity {
 
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -47976,6 +47895,57 @@ class Vec3 {
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = Vec3;
 
+
+/***/ }),
+/* 10 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (immutable) */ __webpack_exports__["a"] = spawnTriangle;
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_three__ = __webpack_require__(0);
+
+
+function spawnTriangle(tri, mat) {
+    let off = -500;
+    let material = mat;
+
+    let geom = new __WEBPACK_IMPORTED_MODULE_0_three__["Geometry"]();
+    let v1 = new __WEBPACK_IMPORTED_MODULE_0_three__["Vector3"](tri[0].x + off, tri[0].y + off, tri[0].z);
+    let v2 = new __WEBPACK_IMPORTED_MODULE_0_three__["Vector3"](tri[1].x + off, tri[1].y + off, tri[1].z);
+    let v3 = new __WEBPACK_IMPORTED_MODULE_0_three__["Vector3"](tri[2].x + off, tri[2].y + off, tri[2].z);
+
+    geom.vertices.push(v1);
+    geom.vertices.push(v2);
+    geom.vertices.push(v3);
+
+    geom.faces.push(new __WEBPACK_IMPORTED_MODULE_0_three__["Face3"](0, 1, 2));
+
+    return {
+        geometry: geom,
+        material: material
+    };
+}
+
+// find common edges
+
+// let vertPairs = []
+// vertices.forEach(v=>{ 
+//     vertPairs.push({
+//         x:v[0],
+//         y:v[1],
+//         matches: []
+//     })
+// })
+
+// vertPairs.forEach(v => {
+//     for (var i = 0; i < triangles.length; i++) {
+//         for (var j = 0; j < triangles[i].length; j++) {
+//             if(v.x === triangles[i][j].x && v.y === triangles[i][j].y){
+//                 v.matches.push([i, j])
+//             }
+//         }
+//     }
+// })
 
 /***/ })
 /******/ ]);
