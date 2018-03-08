@@ -1,14 +1,10 @@
 import {loadScene} from './modules/Loaders.js'
 
-let canvas1 = document.getElementById('canvas1')
-let canvas2 = document.getElementById('canvas2')
-
+//mängden punkter som skapar trianglar
+let vertices = 74
 
 Promise.all([
-
-    //mänden vetices som laddas
-
-    loadScene(74)
+    loadScene(vertices)
 ]).then(([master])=>{
 
     function render() {

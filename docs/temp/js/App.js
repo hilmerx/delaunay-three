@@ -46347,14 +46347,10 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__ = __webpack_require__(3);
 
 
-let canvas1 = document.getElementById('canvas1');
-let canvas2 = document.getElementById('canvas2');
+//mängden punkter som skapar trianglar
+let vertices = 74;
 
-Promise.all([
-
-//mänden vetices som laddas
-
-Object(__WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__["a" /* loadScene */])(74)]).then(([master]) => {
+Promise.all([Object(__WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__["a" /* loadScene */])(vertices)]).then(([master]) => {
 
     function render() {
         requestAnimationFrame(render);
