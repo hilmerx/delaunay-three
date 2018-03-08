@@ -60,809 +60,11 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 1);
+/******/ 	return __webpack_require__(__webpack_require__.s = 2);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/*
- * A speed-improved perlin and simplex noise algorithms for 2D.
- *
- * Based on example code by Stefan Gustavson (stegu@itn.liu.se).
- * Optimisations by Peter Eastman (peastman@drizzle.stanford.edu).
- * Better rank ordering method by Stefan Gustavson in 2012.
- * Converted to Javascript by Joseph Gentle.
- *
- * Version 2012-03-09
- *
- * This code was placed in the public domain by its original author,
- * Stefan Gustavson. You may use it as you see fit, but
- * attribution is appreciated.
- *
- */
-
-(function(global){
-
-  // Passing in seed will seed this Noise instance
-  function Noise(seed) {
-    function Grad(x, y, z) {
-      this.x = x; this.y = y; this.z = z;
-    }
-
-    Grad.prototype.dot2 = function(x, y) {
-      return this.x*x + this.y*y;
-    };
-
-    Grad.prototype.dot3 = function(x, y, z) {
-      return this.x*x + this.y*y + this.z*z;
-    };
-
-    this.grad3 = [new Grad(1,1,0),new Grad(-1,1,0),new Grad(1,-1,0),new Grad(-1,-1,0),
-                 new Grad(1,0,1),new Grad(-1,0,1),new Grad(1,0,-1),new Grad(-1,0,-1),
-                 new Grad(0,1,1),new Grad(0,-1,1),new Grad(0,1,-1),new Grad(0,-1,-1)];
-
-    this.p = [151,160,137,91,90,15,
-    131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
-    190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
-    88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
-    77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
-    102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
-    135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
-    5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
-    223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
-    129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
-    251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
-    49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
-    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
-    // To remove the need for index wrapping, double the permutation table length
-    this.perm = new Array(512);
-    this.gradP = new Array(512);
-
-    this.seed(seed || 0);
-  }
-
-  // This isn't a very good seeding function, but it works ok. It supports 2^16
-  // different seed values. Write something better if you need more seeds.
-  Noise.prototype.seed = function(seed) {
-    if(seed > 0 && seed < 1) {
-      // Scale the seed out
-      seed *= 65536;
-    }
-
-    seed = Math.floor(seed);
-    if(seed < 256) {
-      seed |= seed << 8;
-    }
-
-    var p = this.p;
-    for(var i = 0; i < 256; i++) {
-      var v;
-      if (i & 1) {
-        v = p[i] ^ (seed & 255);
-      } else {
-        v = p[i] ^ ((seed>>8) & 255);
-      }
-
-      var perm = this.perm;
-      var gradP = this.gradP;
-      perm[i] = perm[i + 256] = v;
-      gradP[i] = gradP[i + 256] = this.grad3[v % 12];
-    }
-  };
-
-  /*
-  for(var i=0; i<256; i++) {
-    perm[i] = perm[i + 256] = p[i];
-    gradP[i] = gradP[i + 256] = grad3[perm[i] % 12];
-  }*/
-
-  // Skewing and unskewing factors for 2, 3, and 4 dimensions
-  var F2 = 0.5*(Math.sqrt(3)-1);
-  var G2 = (3-Math.sqrt(3))/6;
-
-  var F3 = 1/3;
-  var G3 = 1/6;
-
-  // 2D simplex noise
-  Noise.prototype.simplex2 = function(xin, yin) {
-    var n0, n1, n2; // Noise contributions from the three corners
-    // Skew the input space to determine which simplex cell we're in
-    var s = (xin+yin)*F2; // Hairy factor for 2D
-    var i = Math.floor(xin+s);
-    var j = Math.floor(yin+s);
-    var t = (i+j)*G2;
-    var x0 = xin-i+t; // The x,y distances from the cell origin, unskewed.
-    var y0 = yin-j+t;
-    // For the 2D case, the simplex shape is an equilateral triangle.
-    // Determine which simplex we are in.
-    var i1, j1; // Offsets for second (middle) corner of simplex in (i,j) coords
-    if(x0>y0) { // lower triangle, XY order: (0,0)->(1,0)->(1,1)
-      i1=1; j1=0;
-    } else {    // upper triangle, YX order: (0,0)->(0,1)->(1,1)
-      i1=0; j1=1;
-    }
-    // A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
-    // a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
-    // c = (3-sqrt(3))/6
-    var x1 = x0 - i1 + G2; // Offsets for middle corner in (x,y) unskewed coords
-    var y1 = y0 - j1 + G2;
-    var x2 = x0 - 1 + 2 * G2; // Offsets for last corner in (x,y) unskewed coords
-    var y2 = y0 - 1 + 2 * G2;
-    // Work out the hashed gradient indices of the three simplex corners
-    i &= 255;
-    j &= 255;
-
-    var perm = this.perm;
-    var gradP = this.gradP;
-    var gi0 = gradP[i+perm[j]];
-    var gi1 = gradP[i+i1+perm[j+j1]];
-    var gi2 = gradP[i+1+perm[j+1]];
-    // Calculate the contribution from the three corners
-    var t0 = 0.5 - x0*x0-y0*y0;
-    if(t0<0) {
-      n0 = 0;
-    } else {
-      t0 *= t0;
-      n0 = t0 * t0 * gi0.dot2(x0, y0);  // (x,y) of grad3 used for 2D gradient
-    }
-    var t1 = 0.5 - x1*x1-y1*y1;
-    if(t1<0) {
-      n1 = 0;
-    } else {
-      t1 *= t1;
-      n1 = t1 * t1 * gi1.dot2(x1, y1);
-    }
-    var t2 = 0.5 - x2*x2-y2*y2;
-    if(t2<0) {
-      n2 = 0;
-    } else {
-      t2 *= t2;
-      n2 = t2 * t2 * gi2.dot2(x2, y2);
-    }
-    // Add contributions from each corner to get the final noise value.
-    // The result is scaled to return values in the interval [-1,1].
-    return 70 * (n0 + n1 + n2);
-  };
-
-  // 3D simplex noise
-  Noise.prototype.simplex3 = function(xin, yin, zin) {
-    var n0, n1, n2, n3; // Noise contributions from the four corners
-
-    // Skew the input space to determine which simplex cell we're in
-    var s = (xin+yin+zin)*F3; // Hairy factor for 2D
-    var i = Math.floor(xin+s);
-    var j = Math.floor(yin+s);
-    var k = Math.floor(zin+s);
-
-    var t = (i+j+k)*G3;
-    var x0 = xin-i+t; // The x,y distances from the cell origin, unskewed.
-    var y0 = yin-j+t;
-    var z0 = zin-k+t;
-
-    // For the 3D case, the simplex shape is a slightly irregular tetrahedron.
-    // Determine which simplex we are in.
-    var i1, j1, k1; // Offsets for second corner of simplex in (i,j,k) coords
-    var i2, j2, k2; // Offsets for third corner of simplex in (i,j,k) coords
-    if(x0 >= y0) {
-      if(y0 >= z0)      { i1=1; j1=0; k1=0; i2=1; j2=1; k2=0; }
-      else if(x0 >= z0) { i1=1; j1=0; k1=0; i2=1; j2=0; k2=1; }
-      else              { i1=0; j1=0; k1=1; i2=1; j2=0; k2=1; }
-    } else {
-      if(y0 < z0)      { i1=0; j1=0; k1=1; i2=0; j2=1; k2=1; }
-      else if(x0 < z0) { i1=0; j1=1; k1=0; i2=0; j2=1; k2=1; }
-      else             { i1=0; j1=1; k1=0; i2=1; j2=1; k2=0; }
-    }
-    // A step of (1,0,0) in (i,j,k) means a step of (1-c,-c,-c) in (x,y,z),
-    // a step of (0,1,0) in (i,j,k) means a step of (-c,1-c,-c) in (x,y,z), and
-    // a step of (0,0,1) in (i,j,k) means a step of (-c,-c,1-c) in (x,y,z), where
-    // c = 1/6.
-    var x1 = x0 - i1 + G3; // Offsets for second corner
-    var y1 = y0 - j1 + G3;
-    var z1 = z0 - k1 + G3;
-
-    var x2 = x0 - i2 + 2 * G3; // Offsets for third corner
-    var y2 = y0 - j2 + 2 * G3;
-    var z2 = z0 - k2 + 2 * G3;
-
-    var x3 = x0 - 1 + 3 * G3; // Offsets for fourth corner
-    var y3 = y0 - 1 + 3 * G3;
-    var z3 = z0 - 1 + 3 * G3;
-
-    // Work out the hashed gradient indices of the four simplex corners
-    i &= 255;
-    j &= 255;
-    k &= 255;
-
-    var perm = this.perm;
-    var gradP = this.gradP;
-    var gi0 = gradP[i+   perm[j+   perm[k   ]]];
-    var gi1 = gradP[i+i1+perm[j+j1+perm[k+k1]]];
-    var gi2 = gradP[i+i2+perm[j+j2+perm[k+k2]]];
-    var gi3 = gradP[i+ 1+perm[j+ 1+perm[k+ 1]]];
-
-    // Calculate the contribution from the four corners
-    var t0 = 0.5 - x0*x0-y0*y0-z0*z0;
-    if(t0<0) {
-      n0 = 0;
-    } else {
-      t0 *= t0;
-      n0 = t0 * t0 * gi0.dot3(x0, y0, z0);  // (x,y) of grad3 used for 2D gradient
-    }
-    var t1 = 0.5 - x1*x1-y1*y1-z1*z1;
-    if(t1<0) {
-      n1 = 0;
-    } else {
-      t1 *= t1;
-      n1 = t1 * t1 * gi1.dot3(x1, y1, z1);
-    }
-    var t2 = 0.5 - x2*x2-y2*y2-z2*z2;
-    if(t2<0) {
-      n2 = 0;
-    } else {
-      t2 *= t2;
-      n2 = t2 * t2 * gi2.dot3(x2, y2, z2);
-    }
-    var t3 = 0.5 - x3*x3-y3*y3-z3*z3;
-    if(t3<0) {
-      n3 = 0;
-    } else {
-      t3 *= t3;
-      n3 = t3 * t3 * gi3.dot3(x3, y3, z3);
-    }
-    // Add contributions from each corner to get the final noise value.
-    // The result is scaled to return values in the interval [-1,1].
-    return 32 * (n0 + n1 + n2 + n3);
-
-  };
-
-  // ##### Perlin noise stuff
-
-  function fade(t) {
-    return t*t*t*(t*(t*6-15)+10);
-  }
-
-  function lerp(a, b, t) {
-    return (1-t)*a + t*b;
-  }
-
-  // 2D Perlin Noise
-  Noise.prototype.perlin2 = function(x, y) {
-    // Find unit grid cell containing point
-    var X = Math.floor(x), Y = Math.floor(y);
-    // Get relative xy coordinates of point within that cell
-    x = x - X; y = y - Y;
-    // Wrap the integer cells at 255 (smaller integer period can be introduced here)
-    X = X & 255; Y = Y & 255;
-
-    // Calculate noise contributions from each of the four corners
-    var perm = this.perm;
-    var gradP = this.gradP;
-    var n00 = gradP[X+perm[Y]].dot2(x, y);
-    var n01 = gradP[X+perm[Y+1]].dot2(x, y-1);
-    var n10 = gradP[X+1+perm[Y]].dot2(x-1, y);
-    var n11 = gradP[X+1+perm[Y+1]].dot2(x-1, y-1);
-
-    // Compute the fade curve value for x
-    var u = fade(x);
-
-    // Interpolate the four results
-    return lerp(
-        lerp(n00, n10, u),
-        lerp(n01, n11, u),
-       fade(y));
-  };
-
-  // 3D Perlin Noise
-  Noise.prototype.perlin3 = function(x, y, z) {
-    // Find unit grid cell containing point
-    var X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z);
-    // Get relative xyz coordinates of point within that cell
-    x = x - X; y = y - Y; z = z - Z;
-    // Wrap the integer cells at 255 (smaller integer period can be introduced here)
-    X = X & 255; Y = Y & 255; Z = Z & 255;
-
-    // Calculate noise contributions from each of the eight corners
-    var perm = this.perm;
-    var gradP = this.gradP;
-    var n000 = gradP[X+  perm[Y+  perm[Z  ]]].dot3(x,   y,     z);
-    var n001 = gradP[X+  perm[Y+  perm[Z+1]]].dot3(x,   y,   z-1);
-    var n010 = gradP[X+  perm[Y+1+perm[Z  ]]].dot3(x,   y-1,   z);
-    var n011 = gradP[X+  perm[Y+1+perm[Z+1]]].dot3(x,   y-1, z-1);
-    var n100 = gradP[X+1+perm[Y+  perm[Z  ]]].dot3(x-1,   y,   z);
-    var n101 = gradP[X+1+perm[Y+  perm[Z+1]]].dot3(x-1,   y, z-1);
-    var n110 = gradP[X+1+perm[Y+1+perm[Z  ]]].dot3(x-1, y-1,   z);
-    var n111 = gradP[X+1+perm[Y+1+perm[Z+1]]].dot3(x-1, y-1, z-1);
-
-    // Compute the fade curve value for x, y, z
-    var u = fade(x);
-    var v = fade(y);
-    var w = fade(z);
-
-    // Interpolate
-    return lerp(
-        lerp(
-          lerp(n000, n100, u),
-          lerp(n001, n101, u), w),
-        lerp(
-          lerp(n010, n110, u),
-          lerp(n011, n111, u), w),
-       v);
-  };
-
-  global.Noise = Noise;
-
-})( false ? this : module.exports);
-
-
-/***/ }),
-/* 1 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_three__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_noisejs__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_noisejs___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_2_noisejs__);
-
-
-// import OrbitControls from 'three-orbit-controls'
-
-
-__WEBPACK_IMPORTED_MODULE_1_three__["OrbitControls"] = __webpack_require__(5)(__WEBPACK_IMPORTED_MODULE_1_three__);
-let canvas1 = document.getElementById('canvas1');
-let canvas2 = document.getElementById('canvas2');
-
-var noise = new __WEBPACK_IMPORTED_MODULE_2_noisejs__["Noise"](Math.random());
-let circularWeb = new __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__["a" /* default */](25, canvas2);
-
-class SceneManager {
-    constructor() {
-
-        this.scene = new __WEBPACK_IMPORTED_MODULE_1_three__["Scene"]();
-        this.camera = new __WEBPACK_IMPORTED_MODULE_1_three__["PerspectiveCamera"](35, window.innerWidth / window.innerHeight, 0.1, 3000);
-
-        this.controls = new __WEBPACK_IMPORTED_MODULE_1_three__["OrbitControls"](this.camera);
-        this.renderer = new __WEBPACK_IMPORTED_MODULE_1_three__["WebGLRenderer"]({ canvas: canvas1, anitalias: true });
-
-        this.update();
-    }
-
-    update() {
-        // camera.position.set( 0, 20, 100 );
-        this.controls.update();
-        // requestAnimationFrame(this.update())
-        this.renderer.render(this.scene, this.camera);
-    }
-}
-
-let scene = new SceneManager();
-
-// function makeTriangle(tri){
-//     var off = -500
-//     var meshMaterial = new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff});
-
-//     var geom = new THREE.Geometry(); 
-//     var v1 = new THREE.Vector3(tri[0].x + off,tri[0].y + off, tri[0].z);
-//     var v2 = new THREE.Vector3(tri[1].x + off,tri[1].y + off, tri[1].z);
-//     var v3 = new THREE.Vector3(tri[2].x + off,tri[2].y + off, tri[2].z);
-
-
-//     geom.vertices.push(v1);
-//     geom.vertices.push(v2);
-//     geom.vertices.push(v3);
-
-
-//     geom.faces.push( new THREE.Face3( 0, 1, 2 ) );
-
-
-//     var object = new THREE.Mesh( geom, meshMaterial);
-//     object.doubleSided = true;
-//     scene.add(object);
-// }
-
-
-// triangles.forEach(tri => {
-//     makeTriangle(tri)
-//     // console.log(tri);
-// })
-
-
-/*
-        var render = function () {
-        // camera.position.set( 0, 20, 100 );
-        controls.update();
-
-        requestAnimationFrame(render);
-            renderer.render(scene, camera);
-        }
-        render();
-
-*/
-
-/*
-
-        let vertPairs = []
-        vertices.forEach(v=>{ 
-            vertPairs.push({
-                x:v[0],
-                y:v[1],
-                matches: []
-            })
-        })
-
-        vertPairs.forEach(v => {
-            for (var i = 0; i < triangles.length; i++) {
-                for (var j = 0; j < triangles[i].length; j++) {
-                    if(v.x === triangles[i][j].x && v.y === triangles[i][j].y){
-                        v.matches.push([i, j])
-                    }
-                }
-            }
-        })
-
-
-
-        function makeZ(){
-            vertPairs.forEach(vert =>{
-                let div, z
-                div = 400
-                z = noise.perlin2(vert.x / div, vert.y / div) * 100
-                div = 800
-                z = noise.perlin2(vert.x / div, vert.y / div) * 200 + z
-                div = 150
-                z = noise.perlin2(vert.x / div, vert.y / div) * 50 + z
-                vert.matches.forEach(m=>{
-                    triangles[m[0]][m[1]].z = z
-                })
-            })
-        }
-        // makeZ()
-
-        triangles.forEach(tri => {
-            tri.forEach(vert => {
-                let div = 300
-                vert.z = noise.perlin2(vert.x / div, vert.y / div) * 100
-            })
-        })*/
-
-var light1 = new __WEBPACK_IMPORTED_MODULE_1_three__["AmbientLight"](0x888888);
-scene.scene.add(light1);
-
-var light2 = new __WEBPACK_IMPORTED_MODULE_1_three__["PointLight"](0xffffff, 1, 100);
-light2.position.set(50, 50, 50);
-scene.scene.add(light2);
-
-scene.camera.position.z = 300;
-
-var geometry = new __WEBPACK_IMPORTED_MODULE_1_three__["BoxGeometry"](1, 1, 2);
-var material = new __WEBPACK_IMPORTED_MODULE_1_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff });
-var cube = new __WEBPACK_IMPORTED_MODULE_1_three__["Mesh"](geometry, material);
-scene.scene.add(cube);
-scene.update();
-
-/***/ }),
-/* 2 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Delaunay_js__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_noisejs__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_noisejs___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_noisejs__);
-
-
-let delaunay = new __WEBPACK_IMPORTED_MODULE_0__Delaunay_js__["a" /* default */](); //varför funkar
-
-
-class CircularWeb {
-    constructor(points, canvas) {
-        this.vertices = new Array(points), this.i;
-        this.x;
-        this.y;
-        this.triangles1D;
-        this.triangles = [];
-
-        this.createTriangles(canvas);
-        this.draw(canvas);
-    }
-
-    createTriangles(canvas, Delaunay) {
-        for (this.i = this.vertices.length; this.i--;) {
-            do {
-                this.x = Math.random() - 0.5;
-                this.y = Math.random() - 0.5;
-            } while (this.x * this.x + this.y * this.y > 0.25);
-
-            this.x = (this.x * 0.96875 + 0.5) * canvas.width;
-            this.y = (this.y * 0.96875 + 0.5) * canvas.height;
-
-            this.vertices[this.i] = [this.x, this.y];
-        }
-
-        this.triangles1D = delaunay.triangulate(this.vertices);
-    }
-
-    draw(canvas) {
-        let ctx = canvas.getContext('2d');
-
-        for (this.i = this.triangles1D.length; this.i;) {
-            let buffer = [];
-            ctx.beginPath();
-            --this.i;ctx.moveTo(this.vertices[this.triangles1D[this.i]][0], this.vertices[this.triangles1D[this.i]][1]);
-            buffer.push({
-                x: this.vertices[this.triangles1D[this.i]][0],
-                y: this.vertices[this.triangles1D[this.i]][1]
-            });
-
-            --this.i;ctx.lineTo(this.vertices[this.triangles1D[this.i]][0], this.vertices[this.triangles1D[this.i]][1]);
-            buffer.push({
-                x: this.vertices[this.triangles1D[this.i]][0],
-                y: this.vertices[this.triangles1D[this.i]][1]
-            });
-
-            --this.i;ctx.lineTo(this.vertices[this.triangles1D[this.i]][0], this.vertices[this.triangles1D[this.i]][1]);
-            buffer.push({
-                x: this.vertices[this.triangles1D[this.i]][0],
-                y: this.vertices[this.triangles1D[this.i]][1]
-            });
-
-            ctx.closePath();
-            ctx.stroke();
-            this.triangles.push(buffer);
-        }
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = CircularWeb;
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-var Delaunay;
-
-(function () {
-    'use strict';
-
-    var EPSILON = 1.0 / 1048576.0;
-
-    function supertriangle(vertices) {
-        var xmin = Number.POSITIVE_INFINITY,
-            ymin = Number.POSITIVE_INFINITY,
-            xmax = Number.NEGATIVE_INFINITY,
-            ymax = Number.NEGATIVE_INFINITY,
-            i,
-            dx,
-            dy,
-            dmax,
-            xmid,
-            ymid;
-
-        for (i = vertices.length; i--;) {
-            if (vertices[i][0] < xmin) xmin = vertices[i][0];
-            if (vertices[i][0] > xmax) xmax = vertices[i][0];
-            if (vertices[i][1] < ymin) ymin = vertices[i][1];
-            if (vertices[i][1] > ymax) ymax = vertices[i][1];
-        }
-
-        dx = xmax - xmin;
-        dy = ymax - ymin;
-        dmax = Math.max(dx, dy);
-        xmid = xmin + dx * 0.5;
-        ymid = ymin + dy * 0.5;
-
-        return [[xmid - 20 * dmax, ymid - dmax], [xmid, ymid + 20 * dmax], [xmid + 20 * dmax, ymid - dmax]];
-    }
-
-    function circumcircle(vertices, i, j, k) {
-        var x1 = vertices[i][0],
-            y1 = vertices[i][1],
-            x2 = vertices[j][0],
-            y2 = vertices[j][1],
-            x3 = vertices[k][0],
-            y3 = vertices[k][1],
-            fabsy1y2 = Math.abs(y1 - y2),
-            fabsy2y3 = Math.abs(y2 - y3),
-            xc,
-            yc,
-            m1,
-            m2,
-            mx1,
-            mx2,
-            my1,
-            my2,
-            dx,
-            dy;
-
-        /* Check for coincident points */
-        if (fabsy1y2 < EPSILON && fabsy2y3 < EPSILON) throw new Error('Eek! Coincident points!');
-
-        if (fabsy1y2 < EPSILON) {
-            m2 = -((x3 - x2) / (y3 - y2));
-            mx2 = (x2 + x3) / 2.0;
-            my2 = (y2 + y3) / 2.0;
-            xc = (x2 + x1) / 2.0;
-            yc = m2 * (xc - mx2) + my2;
-        } else if (fabsy2y3 < EPSILON) {
-            m1 = -((x2 - x1) / (y2 - y1));
-            mx1 = (x1 + x2) / 2.0;
-            my1 = (y1 + y2) / 2.0;
-            xc = (x3 + x2) / 2.0;
-            yc = m1 * (xc - mx1) + my1;
-        } else {
-            m1 = -((x2 - x1) / (y2 - y1));
-            m2 = -((x3 - x2) / (y3 - y2));
-            mx1 = (x1 + x2) / 2.0;
-            mx2 = (x2 + x3) / 2.0;
-            my1 = (y1 + y2) / 2.0;
-            my2 = (y2 + y3) / 2.0;
-            xc = (m1 * mx1 - m2 * mx2 + my2 - my1) / (m1 - m2);
-            yc = fabsy1y2 > fabsy2y3 ? m1 * (xc - mx1) + my1 : m2 * (xc - mx2) + my2;
-        }
-
-        dx = x2 - xc;
-        dy = y2 - yc;
-        return { i: i, j: j, k: k, x: xc, y: yc, r: dx * dx + dy * dy };
-    }
-
-    function dedup(edges) {
-        var i, j, a, b, m, n;
-
-        for (j = edges.length; j;) {
-            b = edges[--j];
-            a = edges[--j];
-
-            for (i = j; i;) {
-                n = edges[--i];
-                m = edges[--i];
-
-                if (a === m && b === n || a === n && b === m) {
-                    edges.splice(j, 2);
-                    edges.splice(i, 2);
-                    break;
-                }
-            }
-        }
-    }
-
-    Delaunay = {
-        triangulate: function (vertices, key) {
-            var n = vertices.length,
-                i,
-                j,
-                indices,
-                st,
-                open,
-                closed,
-                edges,
-                dx,
-                dy,
-                a,
-                b,
-                c;
-
-            /* Bail if there aren't enough vertices to form any triangles. */
-            if (n < 3) return [];
-
-            /* Slice out the actual vertices from the passed objects. (Duplicate the
-             * array even if we don't, though, since we need to make a supertriangle
-             * later on!) */
-            vertices = vertices.slice(0);
-
-            if (key) for (i = n; i--;) vertices[i] = vertices[i][key];
-
-            /* Make an array of indices into the vertex array, sorted by the
-             * vertices' x-position. Force stable sorting by comparing indices if
-             * the x-positions are equal. */
-            indices = new Array(n);
-
-            for (i = n; i--;) indices[i] = i;
-
-            indices.sort(function (i, j) {
-                var diff = vertices[j][0] - vertices[i][0];
-                return diff !== 0 ? diff : i - j;
-            });
-
-            /* Next, find the vertices of the supertriangle (which contains all other
-             * triangles), and append them onto the end of a (copy of) the vertex
-             * array. */
-            st = supertriangle(vertices);
-            vertices.push(st[0], st[1], st[2]);
-
-            /* Initialize the open list (containing the supertriangle and nothing
-             * else) and the closed list (which is empty since we havn't processed
-             * any triangles yet). */
-            open = [circumcircle(vertices, n + 0, n + 1, n + 2)];
-            closed = [];
-            edges = [];
-
-            /* Incrementally add each vertex to the mesh. */
-            for (i = indices.length; i--; edges.length = 0) {
-                c = indices[i];
-
-                /* For each open triangle, check to see if the current point is
-                 * inside it's circumcircle. If it is, remove the triangle and add
-                 * it's edges to an edge list. */
-                for (j = open.length; j--;) {
-                    /* If this point is to the right of this triangle's circumcircle,
-                     * then this triangle should never get checked again. Remove it
-                     * from the open list, add it to the closed list, and skip. */
-                    dx = vertices[c][0] - open[j].x;
-                    if (dx > 0.0 && dx * dx > open[j].r) {
-                        closed.push(open[j]);
-                        open.splice(j, 1);
-                        continue;
-                    }
-
-                    /* If we're outside the circumcircle, skip this triangle. */
-                    dy = vertices[c][1] - open[j].y;
-                    if (dx * dx + dy * dy - open[j].r > EPSILON) continue;
-
-                    /* Remove the triangle and add it's edges to the edge list. */
-                    edges.push(open[j].i, open[j].j, open[j].j, open[j].k, open[j].k, open[j].i);
-                    open.splice(j, 1);
-                }
-
-                /* Remove any doubled edges. */
-                dedup(edges);
-
-                /* Add a new triangle for each edge. */
-                for (j = edges.length; j;) {
-                    b = edges[--j];
-                    a = edges[--j];
-                    open.push(circumcircle(vertices, a, b, c));
-                }
-            }
-
-            /* Copy any remaining open triangles to the closed list, and then
-             * remove any triangles that share a vertex with the supertriangle,
-             * building a list of triplets that represent triangles. */
-            for (i = open.length; i--;) closed.push(open[i]);
-            open.length = 0;
-
-            for (i = closed.length; i--;) if (closed[i].i < n && closed[i].j < n && closed[i].k < n) open.push(closed[i].i, closed[i].j, closed[i].k);
-
-            /* Yay, we're done! */
-            return open;
-        },
-        contains: function (tri, p) {
-            /* Bounding box test first, for quick rejections. */
-            if (p[0] < tri[0][0] && p[0] < tri[1][0] && p[0] < tri[2][0] || p[0] > tri[0][0] && p[0] > tri[1][0] && p[0] > tri[2][0] || p[1] < tri[0][1] && p[1] < tri[1][1] && p[1] < tri[2][1] || p[1] > tri[0][1] && p[1] > tri[1][1] && p[1] > tri[2][1]) return null;
-
-            var a = tri[1][0] - tri[0][0],
-                b = tri[2][0] - tri[0][0],
-                c = tri[1][1] - tri[0][1],
-                d = tri[2][1] - tri[0][1],
-                i = a * d - b * c;
-
-            /* Degenerate tri. */
-            if (i === 0.0) return null;
-
-            var u = (d * (p[0] - tri[0][0]) - b * (p[1] - tri[0][1])) / i,
-                v = (a * (p[1] - tri[0][1]) - c * (p[0] - tri[0][0])) / i;
-
-            /* If we're outside the tri, fail. */
-            if (u < 0.0 || v < 0.0 || u + v > 1.0) return null;
-
-            return [u, v];
-        }
-    };
-})();
-
-class DelaunayClass {
-    constructor() {
-        this.contains = Delaunay.contains;
-        this.triangulate = Delaunay.triangulate;
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = DelaunayClass;
-
-
-/***/ }),
-/* 4 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -46804,7 +46006,885 @@ function LensFlare() {
 
 
 /***/ }),
+/* 1 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/*
+ * A speed-improved perlin and simplex noise algorithms for 2D.
+ *
+ * Based on example code by Stefan Gustavson (stegu@itn.liu.se).
+ * Optimisations by Peter Eastman (peastman@drizzle.stanford.edu).
+ * Better rank ordering method by Stefan Gustavson in 2012.
+ * Converted to Javascript by Joseph Gentle.
+ *
+ * Version 2012-03-09
+ *
+ * This code was placed in the public domain by its original author,
+ * Stefan Gustavson. You may use it as you see fit, but
+ * attribution is appreciated.
+ *
+ */
+
+(function(global){
+
+  // Passing in seed will seed this Noise instance
+  function Noise(seed) {
+    function Grad(x, y, z) {
+      this.x = x; this.y = y; this.z = z;
+    }
+
+    Grad.prototype.dot2 = function(x, y) {
+      return this.x*x + this.y*y;
+    };
+
+    Grad.prototype.dot3 = function(x, y, z) {
+      return this.x*x + this.y*y + this.z*z;
+    };
+
+    this.grad3 = [new Grad(1,1,0),new Grad(-1,1,0),new Grad(1,-1,0),new Grad(-1,-1,0),
+                 new Grad(1,0,1),new Grad(-1,0,1),new Grad(1,0,-1),new Grad(-1,0,-1),
+                 new Grad(0,1,1),new Grad(0,-1,1),new Grad(0,1,-1),new Grad(0,-1,-1)];
+
+    this.p = [151,160,137,91,90,15,
+    131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
+    190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
+    88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
+    77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
+    102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
+    135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
+    5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
+    223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
+    129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
+    251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
+    49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
+    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+    // To remove the need for index wrapping, double the permutation table length
+    this.perm = new Array(512);
+    this.gradP = new Array(512);
+
+    this.seed(seed || 0);
+  }
+
+  // This isn't a very good seeding function, but it works ok. It supports 2^16
+  // different seed values. Write something better if you need more seeds.
+  Noise.prototype.seed = function(seed) {
+    if(seed > 0 && seed < 1) {
+      // Scale the seed out
+      seed *= 65536;
+    }
+
+    seed = Math.floor(seed);
+    if(seed < 256) {
+      seed |= seed << 8;
+    }
+
+    var p = this.p;
+    for(var i = 0; i < 256; i++) {
+      var v;
+      if (i & 1) {
+        v = p[i] ^ (seed & 255);
+      } else {
+        v = p[i] ^ ((seed>>8) & 255);
+      }
+
+      var perm = this.perm;
+      var gradP = this.gradP;
+      perm[i] = perm[i + 256] = v;
+      gradP[i] = gradP[i + 256] = this.grad3[v % 12];
+    }
+  };
+
+  /*
+  for(var i=0; i<256; i++) {
+    perm[i] = perm[i + 256] = p[i];
+    gradP[i] = gradP[i + 256] = grad3[perm[i] % 12];
+  }*/
+
+  // Skewing and unskewing factors for 2, 3, and 4 dimensions
+  var F2 = 0.5*(Math.sqrt(3)-1);
+  var G2 = (3-Math.sqrt(3))/6;
+
+  var F3 = 1/3;
+  var G3 = 1/6;
+
+  // 2D simplex noise
+  Noise.prototype.simplex2 = function(xin, yin) {
+    var n0, n1, n2; // Noise contributions from the three corners
+    // Skew the input space to determine which simplex cell we're in
+    var s = (xin+yin)*F2; // Hairy factor for 2D
+    var i = Math.floor(xin+s);
+    var j = Math.floor(yin+s);
+    var t = (i+j)*G2;
+    var x0 = xin-i+t; // The x,y distances from the cell origin, unskewed.
+    var y0 = yin-j+t;
+    // For the 2D case, the simplex shape is an equilateral triangle.
+    // Determine which simplex we are in.
+    var i1, j1; // Offsets for second (middle) corner of simplex in (i,j) coords
+    if(x0>y0) { // lower triangle, XY order: (0,0)->(1,0)->(1,1)
+      i1=1; j1=0;
+    } else {    // upper triangle, YX order: (0,0)->(0,1)->(1,1)
+      i1=0; j1=1;
+    }
+    // A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
+    // a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
+    // c = (3-sqrt(3))/6
+    var x1 = x0 - i1 + G2; // Offsets for middle corner in (x,y) unskewed coords
+    var y1 = y0 - j1 + G2;
+    var x2 = x0 - 1 + 2 * G2; // Offsets for last corner in (x,y) unskewed coords
+    var y2 = y0 - 1 + 2 * G2;
+    // Work out the hashed gradient indices of the three simplex corners
+    i &= 255;
+    j &= 255;
+
+    var perm = this.perm;
+    var gradP = this.gradP;
+    var gi0 = gradP[i+perm[j]];
+    var gi1 = gradP[i+i1+perm[j+j1]];
+    var gi2 = gradP[i+1+perm[j+1]];
+    // Calculate the contribution from the three corners
+    var t0 = 0.5 - x0*x0-y0*y0;
+    if(t0<0) {
+      n0 = 0;
+    } else {
+      t0 *= t0;
+      n0 = t0 * t0 * gi0.dot2(x0, y0);  // (x,y) of grad3 used for 2D gradient
+    }
+    var t1 = 0.5 - x1*x1-y1*y1;
+    if(t1<0) {
+      n1 = 0;
+    } else {
+      t1 *= t1;
+      n1 = t1 * t1 * gi1.dot2(x1, y1);
+    }
+    var t2 = 0.5 - x2*x2-y2*y2;
+    if(t2<0) {
+      n2 = 0;
+    } else {
+      t2 *= t2;
+      n2 = t2 * t2 * gi2.dot2(x2, y2);
+    }
+    // Add contributions from each corner to get the final noise value.
+    // The result is scaled to return values in the interval [-1,1].
+    return 70 * (n0 + n1 + n2);
+  };
+
+  // 3D simplex noise
+  Noise.prototype.simplex3 = function(xin, yin, zin) {
+    var n0, n1, n2, n3; // Noise contributions from the four corners
+
+    // Skew the input space to determine which simplex cell we're in
+    var s = (xin+yin+zin)*F3; // Hairy factor for 2D
+    var i = Math.floor(xin+s);
+    var j = Math.floor(yin+s);
+    var k = Math.floor(zin+s);
+
+    var t = (i+j+k)*G3;
+    var x0 = xin-i+t; // The x,y distances from the cell origin, unskewed.
+    var y0 = yin-j+t;
+    var z0 = zin-k+t;
+
+    // For the 3D case, the simplex shape is a slightly irregular tetrahedron.
+    // Determine which simplex we are in.
+    var i1, j1, k1; // Offsets for second corner of simplex in (i,j,k) coords
+    var i2, j2, k2; // Offsets for third corner of simplex in (i,j,k) coords
+    if(x0 >= y0) {
+      if(y0 >= z0)      { i1=1; j1=0; k1=0; i2=1; j2=1; k2=0; }
+      else if(x0 >= z0) { i1=1; j1=0; k1=0; i2=1; j2=0; k2=1; }
+      else              { i1=0; j1=0; k1=1; i2=1; j2=0; k2=1; }
+    } else {
+      if(y0 < z0)      { i1=0; j1=0; k1=1; i2=0; j2=1; k2=1; }
+      else if(x0 < z0) { i1=0; j1=1; k1=0; i2=0; j2=1; k2=1; }
+      else             { i1=0; j1=1; k1=0; i2=1; j2=1; k2=0; }
+    }
+    // A step of (1,0,0) in (i,j,k) means a step of (1-c,-c,-c) in (x,y,z),
+    // a step of (0,1,0) in (i,j,k) means a step of (-c,1-c,-c) in (x,y,z), and
+    // a step of (0,0,1) in (i,j,k) means a step of (-c,-c,1-c) in (x,y,z), where
+    // c = 1/6.
+    var x1 = x0 - i1 + G3; // Offsets for second corner
+    var y1 = y0 - j1 + G3;
+    var z1 = z0 - k1 + G3;
+
+    var x2 = x0 - i2 + 2 * G3; // Offsets for third corner
+    var y2 = y0 - j2 + 2 * G3;
+    var z2 = z0 - k2 + 2 * G3;
+
+    var x3 = x0 - 1 + 3 * G3; // Offsets for fourth corner
+    var y3 = y0 - 1 + 3 * G3;
+    var z3 = z0 - 1 + 3 * G3;
+
+    // Work out the hashed gradient indices of the four simplex corners
+    i &= 255;
+    j &= 255;
+    k &= 255;
+
+    var perm = this.perm;
+    var gradP = this.gradP;
+    var gi0 = gradP[i+   perm[j+   perm[k   ]]];
+    var gi1 = gradP[i+i1+perm[j+j1+perm[k+k1]]];
+    var gi2 = gradP[i+i2+perm[j+j2+perm[k+k2]]];
+    var gi3 = gradP[i+ 1+perm[j+ 1+perm[k+ 1]]];
+
+    // Calculate the contribution from the four corners
+    var t0 = 0.5 - x0*x0-y0*y0-z0*z0;
+    if(t0<0) {
+      n0 = 0;
+    } else {
+      t0 *= t0;
+      n0 = t0 * t0 * gi0.dot3(x0, y0, z0);  // (x,y) of grad3 used for 2D gradient
+    }
+    var t1 = 0.5 - x1*x1-y1*y1-z1*z1;
+    if(t1<0) {
+      n1 = 0;
+    } else {
+      t1 *= t1;
+      n1 = t1 * t1 * gi1.dot3(x1, y1, z1);
+    }
+    var t2 = 0.5 - x2*x2-y2*y2-z2*z2;
+    if(t2<0) {
+      n2 = 0;
+    } else {
+      t2 *= t2;
+      n2 = t2 * t2 * gi2.dot3(x2, y2, z2);
+    }
+    var t3 = 0.5 - x3*x3-y3*y3-z3*z3;
+    if(t3<0) {
+      n3 = 0;
+    } else {
+      t3 *= t3;
+      n3 = t3 * t3 * gi3.dot3(x3, y3, z3);
+    }
+    // Add contributions from each corner to get the final noise value.
+    // The result is scaled to return values in the interval [-1,1].
+    return 32 * (n0 + n1 + n2 + n3);
+
+  };
+
+  // ##### Perlin noise stuff
+
+  function fade(t) {
+    return t*t*t*(t*(t*6-15)+10);
+  }
+
+  function lerp(a, b, t) {
+    return (1-t)*a + t*b;
+  }
+
+  // 2D Perlin Noise
+  Noise.prototype.perlin2 = function(x, y) {
+    // Find unit grid cell containing point
+    var X = Math.floor(x), Y = Math.floor(y);
+    // Get relative xy coordinates of point within that cell
+    x = x - X; y = y - Y;
+    // Wrap the integer cells at 255 (smaller integer period can be introduced here)
+    X = X & 255; Y = Y & 255;
+
+    // Calculate noise contributions from each of the four corners
+    var perm = this.perm;
+    var gradP = this.gradP;
+    var n00 = gradP[X+perm[Y]].dot2(x, y);
+    var n01 = gradP[X+perm[Y+1]].dot2(x, y-1);
+    var n10 = gradP[X+1+perm[Y]].dot2(x-1, y);
+    var n11 = gradP[X+1+perm[Y+1]].dot2(x-1, y-1);
+
+    // Compute the fade curve value for x
+    var u = fade(x);
+
+    // Interpolate the four results
+    return lerp(
+        lerp(n00, n10, u),
+        lerp(n01, n11, u),
+       fade(y));
+  };
+
+  // 3D Perlin Noise
+  Noise.prototype.perlin3 = function(x, y, z) {
+    // Find unit grid cell containing point
+    var X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z);
+    // Get relative xyz coordinates of point within that cell
+    x = x - X; y = y - Y; z = z - Z;
+    // Wrap the integer cells at 255 (smaller integer period can be introduced here)
+    X = X & 255; Y = Y & 255; Z = Z & 255;
+
+    // Calculate noise contributions from each of the eight corners
+    var perm = this.perm;
+    var gradP = this.gradP;
+    var n000 = gradP[X+  perm[Y+  perm[Z  ]]].dot3(x,   y,     z);
+    var n001 = gradP[X+  perm[Y+  perm[Z+1]]].dot3(x,   y,   z-1);
+    var n010 = gradP[X+  perm[Y+1+perm[Z  ]]].dot3(x,   y-1,   z);
+    var n011 = gradP[X+  perm[Y+1+perm[Z+1]]].dot3(x,   y-1, z-1);
+    var n100 = gradP[X+1+perm[Y+  perm[Z  ]]].dot3(x-1,   y,   z);
+    var n101 = gradP[X+1+perm[Y+  perm[Z+1]]].dot3(x-1,   y, z-1);
+    var n110 = gradP[X+1+perm[Y+1+perm[Z  ]]].dot3(x-1, y-1,   z);
+    var n111 = gradP[X+1+perm[Y+1+perm[Z+1]]].dot3(x-1, y-1, z-1);
+
+    // Compute the fade curve value for x, y, z
+    var u = fade(x);
+    var v = fade(y);
+    var w = fade(z);
+
+    // Interpolate
+    return lerp(
+        lerp(
+          lerp(n000, n100, u),
+          lerp(n001, n101, u), w),
+        lerp(
+          lerp(n010, n110, u),
+          lerp(n011, n111, u), w),
+       v);
+  };
+
+  global.Noise = Noise;
+
+})( false ? this : module.exports);
+
+
+/***/ }),
+/* 2 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__modules_SceneManager_js__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_three__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_noisejs__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_noisejs___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_noisejs__);
+
+
+
+
+
+
+let canvas1 = document.getElementById('canvas1');
+let canvas2 = document.getElementById('canvas2');
+
+var noise = new __WEBPACK_IMPORTED_MODULE_4_noisejs__["Noise"](Math.random());
+let circularWeb = new __WEBPACK_IMPORTED_MODULE_0__modules_CircularWeb_js__["a" /* default */](25, canvas2);
+
+let master = new __WEBPACK_IMPORTED_MODULE_1__modules_SceneManager_js__["a" /* default */]();
+master.camera.position.z = 20;
+
+let light1 = {
+    type: new __WEBPACK_IMPORTED_MODULE_3_three__["AmbientLight"](0x888888),
+    pos: [50, 50, 50]
+};
+master.addLight(light1);
+
+let light2 = {
+    type: new __WEBPACK_IMPORTED_MODULE_3_three__["PointLight"](0xffffff, 1, 100),
+    pos: [50, 50, 50]
+};
+master.addLight(light2);
+
+function render() {
+    requestAnimationFrame(render);
+    master.update();
+}
+render();
+
+//first box
+
+
+let entity = {
+    geometry: new __WEBPACK_IMPORTED_MODULE_3_three__["BoxGeometry"](1, 1, 2),
+    material: new __WEBPACK_IMPORTED_MODULE_3_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff })
+};
+
+let boxSpin = new __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__["a" /* default */](entity);
+
+boxSpin.addTrait(mesh => {
+    mesh.rotation.x += 0.01;
+    mesh.rotation.y += 0.001;
+});
+
+master.addEntity(boxSpin);
+master.update();
+
+//second box
+
+let entity2 = {
+    geometry: new __WEBPACK_IMPORTED_MODULE_3_three__["BoxGeometry"](2, 1, 2),
+    material: new __WEBPACK_IMPORTED_MODULE_3_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff })
+};
+
+let boxSpin2 = new __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__["a" /* default */](entity2);
+
+boxSpin2.addTrait(mesh => {
+    mesh.rotation.x += 0.02;
+    mesh.rotation.y += 0.001;
+});
+boxSpin2.set(3, 0, 0);
+master.addEntity(boxSpin2);
+
+function makeTriangle(tri) {
+    var off = -500;
+    var meshMaterial = new __WEBPACK_IMPORTED_MODULE_3_three__["MeshLambertMaterial"]({ color: Math.random() * 0xffffff });
+
+    var geom = new __WEBPACK_IMPORTED_MODULE_3_three__["Geometry"]();
+    var v1 = new __WEBPACK_IMPORTED_MODULE_3_three__["Vector3"](tri[0].x + off, tri[0].y + off, tri[0].z);
+    var v2 = new __WEBPACK_IMPORTED_MODULE_3_three__["Vector3"](tri[1].x + off, tri[1].y + off, tri[1].z);
+    var v3 = new __WEBPACK_IMPORTED_MODULE_3_three__["Vector3"](tri[2].x + off, tri[2].y + off, tri[2].z);
+
+    geom.vertices.push(v1);
+    geom.vertices.push(v2);
+    geom.vertices.push(v3);
+
+    geom.faces.push(new __WEBPACK_IMPORTED_MODULE_3_three__["Face3"](0, 1, 2));
+
+    var object = new __WEBPACK_IMPORTED_MODULE_3_three__["Mesh"](geom, meshMaterial);
+    object.doubleSided = true;
+    scene.add(object);
+
+    let entityBufferSettings = {
+        geometry: geom,
+        material: meshMaterial
+    };
+
+    let entBuffer = new __WEBPACK_IMPORTED_MODULE_2__modules_Entity_js__["a" /* default */](entityBufferSettings);
+
+    master.addEntity(entBuffer);
+}
+
+//     makeTriangle(tri)
+
+// triangles.forEach(tri => {
+//     makeTriangle(tri)
+//     // console.log(tri);
+// })
+
+
+/*
+        var render = function () {
+        // camera.position.set( 0, 20, 100 );
+        controls.update();
+
+        requestAnimationFrame(render);
+            renderer.render(scene, camera);
+        }
+        render();
+
+*/
+
+/*
+
+        let vertPairs = []
+        vertices.forEach(v=>{ 
+            vertPairs.push({
+                x:v[0],
+                y:v[1],
+                matches: []
+            })
+        })
+
+        vertPairs.forEach(v => {
+            for (var i = 0; i < triangles.length; i++) {
+                for (var j = 0; j < triangles[i].length; j++) {
+                    if(v.x === triangles[i][j].x && v.y === triangles[i][j].y){
+                        v.matches.push([i, j])
+                    }
+                }
+            }
+        })
+
+
+
+        function makeZ(){
+            vertPairs.forEach(vert =>{
+                let div, z
+                div = 400
+                z = noise.perlin2(vert.x / div, vert.y / div) * 100
+                div = 800
+                z = noise.perlin2(vert.x / div, vert.y / div) * 200 + z
+                div = 150
+                z = noise.perlin2(vert.x / div, vert.y / div) * 50 + z
+                vert.matches.forEach(m=>{
+                    triangles[m[0]][m[1]].z = z
+                })
+            })
+        }
+        // makeZ()
+
+        triangles.forEach(tri => {
+            tri.forEach(vert => {
+                let div = 300
+                vert.z = noise.perlin2(vert.x / div, vert.y / div) * 100
+            })
+        })*/
+
+/***/ }),
+/* 3 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Delaunay_js__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_noisejs__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_noisejs___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_noisejs__);
+
+
+let del = new __WEBPACK_IMPORTED_MODULE_0__Delaunay_js__["a" /* default */](); //varför funkar
+
+class CircularWeb {
+    constructor(points, canvas) {
+        this.vertices = new Array(points), this.i;
+        this.x;
+        this.y;
+        this.triangles1D;
+        this.triangles = [];
+        // console.log(Delaunay)
+
+        this.createTriangles(canvas);
+        this.draw(canvas);
+    }
+
+    createTriangles(canvas, Delaunay) {
+        for (this.i = this.vertices.length; this.i--;) {
+            do {
+                this.x = Math.random() - 0.5;
+                this.y = Math.random() - 0.5;
+            } while (this.x * this.x + this.y * this.y > 0.25);
+
+            this.x = (this.x * 0.96875 + 0.5) * canvas.width;
+            this.y = (this.y * 0.96875 + 0.5) * canvas.height;
+
+            this.vertices[this.i] = [this.x, this.y];
+        }
+
+        this.triangles1D = del.triangulate(this.vertices);
+    }
+
+    draw(canvas) {
+        let ctx = canvas.getContext('2d');
+
+        for (this.i = this.triangles1D.length; this.i;) {
+            let buffer = [];
+            ctx.beginPath();
+            --this.i;ctx.moveTo(this.vertices[this.triangles1D[this.i]][0], this.vertices[this.triangles1D[this.i]][1]);
+            buffer.push({
+                x: this.vertices[this.triangles1D[this.i]][0],
+                y: this.vertices[this.triangles1D[this.i]][1]
+            });
+
+            --this.i;ctx.lineTo(this.vertices[this.triangles1D[this.i]][0], this.vertices[this.triangles1D[this.i]][1]);
+            buffer.push({
+                x: this.vertices[this.triangles1D[this.i]][0],
+                y: this.vertices[this.triangles1D[this.i]][1]
+            });
+
+            --this.i;ctx.lineTo(this.vertices[this.triangles1D[this.i]][0], this.vertices[this.triangles1D[this.i]][1]);
+            buffer.push({
+                x: this.vertices[this.triangles1D[this.i]][0],
+                y: this.vertices[this.triangles1D[this.i]][1]
+            });
+
+            ctx.closePath();
+            ctx.stroke();
+            this.triangles.push(buffer);
+        }
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = CircularWeb;
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+var Delaunay;
+
+(function () {
+    'use strict';
+
+    var EPSILON = 1.0 / 1048576.0;
+
+    function supertriangle(vertices) {
+        var xmin = Number.POSITIVE_INFINITY,
+            ymin = Number.POSITIVE_INFINITY,
+            xmax = Number.NEGATIVE_INFINITY,
+            ymax = Number.NEGATIVE_INFINITY,
+            i,
+            dx,
+            dy,
+            dmax,
+            xmid,
+            ymid;
+
+        for (i = vertices.length; i--;) {
+            if (vertices[i][0] < xmin) xmin = vertices[i][0];
+            if (vertices[i][0] > xmax) xmax = vertices[i][0];
+            if (vertices[i][1] < ymin) ymin = vertices[i][1];
+            if (vertices[i][1] > ymax) ymax = vertices[i][1];
+        }
+
+        dx = xmax - xmin;
+        dy = ymax - ymin;
+        dmax = Math.max(dx, dy);
+        xmid = xmin + dx * 0.5;
+        ymid = ymin + dy * 0.5;
+
+        return [[xmid - 20 * dmax, ymid - dmax], [xmid, ymid + 20 * dmax], [xmid + 20 * dmax, ymid - dmax]];
+    }
+
+    function circumcircle(vertices, i, j, k) {
+        var x1 = vertices[i][0],
+            y1 = vertices[i][1],
+            x2 = vertices[j][0],
+            y2 = vertices[j][1],
+            x3 = vertices[k][0],
+            y3 = vertices[k][1],
+            fabsy1y2 = Math.abs(y1 - y2),
+            fabsy2y3 = Math.abs(y2 - y3),
+            xc,
+            yc,
+            m1,
+            m2,
+            mx1,
+            mx2,
+            my1,
+            my2,
+            dx,
+            dy;
+
+        /* Check for coincident points */
+        if (fabsy1y2 < EPSILON && fabsy2y3 < EPSILON) throw new Error('Eek! Coincident points!');
+
+        if (fabsy1y2 < EPSILON) {
+            m2 = -((x3 - x2) / (y3 - y2));
+            mx2 = (x2 + x3) / 2.0;
+            my2 = (y2 + y3) / 2.0;
+            xc = (x2 + x1) / 2.0;
+            yc = m2 * (xc - mx2) + my2;
+        } else if (fabsy2y3 < EPSILON) {
+            m1 = -((x2 - x1) / (y2 - y1));
+            mx1 = (x1 + x2) / 2.0;
+            my1 = (y1 + y2) / 2.0;
+            xc = (x3 + x2) / 2.0;
+            yc = m1 * (xc - mx1) + my1;
+        } else {
+            m1 = -((x2 - x1) / (y2 - y1));
+            m2 = -((x3 - x2) / (y3 - y2));
+            mx1 = (x1 + x2) / 2.0;
+            mx2 = (x2 + x3) / 2.0;
+            my1 = (y1 + y2) / 2.0;
+            my2 = (y2 + y3) / 2.0;
+            xc = (m1 * mx1 - m2 * mx2 + my2 - my1) / (m1 - m2);
+            yc = fabsy1y2 > fabsy2y3 ? m1 * (xc - mx1) + my1 : m2 * (xc - mx2) + my2;
+        }
+
+        dx = x2 - xc;
+        dy = y2 - yc;
+        return { i: i, j: j, k: k, x: xc, y: yc, r: dx * dx + dy * dy };
+    }
+
+    function dedup(edges) {
+        var i, j, a, b, m, n;
+
+        for (j = edges.length; j;) {
+            b = edges[--j];
+            a = edges[--j];
+
+            for (i = j; i;) {
+                n = edges[--i];
+                m = edges[--i];
+
+                if (a === m && b === n || a === n && b === m) {
+                    edges.splice(j, 2);
+                    edges.splice(i, 2);
+                    break;
+                }
+            }
+        }
+    }
+
+    Delaunay = {
+        triangulate: function (vertices, key) {
+            var n = vertices.length,
+                i,
+                j,
+                indices,
+                st,
+                open,
+                closed,
+                edges,
+                dx,
+                dy,
+                a,
+                b,
+                c;
+
+            /* Bail if there aren't enough vertices to form any triangles. */
+            if (n < 3) return [];
+
+            /* Slice out the actual vertices from the passed objects. (Duplicate the
+             * array even if we don't, though, since we need to make a supertriangle
+             * later on!) */
+            vertices = vertices.slice(0);
+
+            if (key) for (i = n; i--;) vertices[i] = vertices[i][key];
+
+            /* Make an array of indices into the vertex array, sorted by the
+             * vertices' x-position. Force stable sorting by comparing indices if
+             * the x-positions are equal. */
+            indices = new Array(n);
+
+            for (i = n; i--;) indices[i] = i;
+
+            indices.sort(function (i, j) {
+                var diff = vertices[j][0] - vertices[i][0];
+                return diff !== 0 ? diff : i - j;
+            });
+
+            /* Next, find the vertices of the supertriangle (which contains all other
+             * triangles), and append them onto the end of a (copy of) the vertex
+             * array. */
+            st = supertriangle(vertices);
+            vertices.push(st[0], st[1], st[2]);
+
+            /* Initialize the open list (containing the supertriangle and nothing
+             * else) and the closed list (which is empty since we havn't processed
+             * any triangles yet). */
+            open = [circumcircle(vertices, n + 0, n + 1, n + 2)];
+            closed = [];
+            edges = [];
+
+            /* Incrementally add each vertex to the mesh. */
+            for (i = indices.length; i--; edges.length = 0) {
+                c = indices[i];
+
+                /* For each open triangle, check to see if the current point is
+                 * inside it's circumcircle. If it is, remove the triangle and add
+                 * it's edges to an edge list. */
+                for (j = open.length; j--;) {
+                    /* If this point is to the right of this triangle's circumcircle,
+                     * then this triangle should never get checked again. Remove it
+                     * from the open list, add it to the closed list, and skip. */
+                    dx = vertices[c][0] - open[j].x;
+                    if (dx > 0.0 && dx * dx > open[j].r) {
+                        closed.push(open[j]);
+                        open.splice(j, 1);
+                        continue;
+                    }
+
+                    /* If we're outside the circumcircle, skip this triangle. */
+                    dy = vertices[c][1] - open[j].y;
+                    if (dx * dx + dy * dy - open[j].r > EPSILON) continue;
+
+                    /* Remove the triangle and add it's edges to the edge list. */
+                    edges.push(open[j].i, open[j].j, open[j].j, open[j].k, open[j].k, open[j].i);
+                    open.splice(j, 1);
+                }
+
+                /* Remove any doubled edges. */
+                dedup(edges);
+
+                /* Add a new triangle for each edge. */
+                for (j = edges.length; j;) {
+                    b = edges[--j];
+                    a = edges[--j];
+                    open.push(circumcircle(vertices, a, b, c));
+                }
+            }
+
+            /* Copy any remaining open triangles to the closed list, and then
+             * remove any triangles that share a vertex with the supertriangle,
+             * building a list of triplets that represent triangles. */
+            for (i = open.length; i--;) closed.push(open[i]);
+            open.length = 0;
+
+            for (i = closed.length; i--;) if (closed[i].i < n && closed[i].j < n && closed[i].k < n) open.push(closed[i].i, closed[i].j, closed[i].k);
+
+            /* Yay, we're done! */
+            return open;
+        },
+        contains: function (tri, p) {
+            /* Bounding box test first, for quick rejections. */
+            if (p[0] < tri[0][0] && p[0] < tri[1][0] && p[0] < tri[2][0] || p[0] > tri[0][0] && p[0] > tri[1][0] && p[0] > tri[2][0] || p[1] < tri[0][1] && p[1] < tri[1][1] && p[1] < tri[2][1] || p[1] > tri[0][1] && p[1] > tri[1][1] && p[1] > tri[2][1]) return null;
+
+            var a = tri[1][0] - tri[0][0],
+                b = tri[2][0] - tri[0][0],
+                c = tri[1][1] - tri[0][1],
+                d = tri[2][1] - tri[0][1],
+                i = a * d - b * c;
+
+            /* Degenerate tri. */
+            if (i === 0.0) return null;
+
+            var u = (d * (p[0] - tri[0][0]) - b * (p[1] - tri[0][1])) / i,
+                v = (a * (p[1] - tri[0][1]) - c * (p[0] - tri[0][0])) / i;
+
+            /* If we're outside the tri, fail. */
+            if (u < 0.0 || v < 0.0 || u + v > 1.0) return null;
+
+            return [u, v];
+        }
+    };
+})();
+
+class DelaunayClass {
+    constructor() {
+        this.contains = Delaunay.contains;
+        this.triangulate = Delaunay.triangulate;
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = DelaunayClass;
+
+
+/***/ }),
 /* 5 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_three__ = __webpack_require__(0);
+
+__WEBPACK_IMPORTED_MODULE_0_three__["OrbitControls"] = __webpack_require__(6)(__WEBPACK_IMPORTED_MODULE_0_three__);
+
+class SceneManager {
+    constructor() {
+
+        this.scene = new __WEBPACK_IMPORTED_MODULE_0_three__["Scene"]();
+        this.camera = new __WEBPACK_IMPORTED_MODULE_0_three__["PerspectiveCamera"](35, window.innerWidth / window.innerHeight, 0.1, 3000);
+
+        this.controls = new __WEBPACK_IMPORTED_MODULE_0_three__["OrbitControls"](this.camera);
+        this.renderer = new __WEBPACK_IMPORTED_MODULE_0_three__["WebGLRenderer"]({ canvas: canvas1, anitalias: true });
+        this.entities = [];
+        this.lights = [];
+        this.update();
+    }
+
+    updateEntities() {
+        let scene = this.scene;
+        this.entities.forEach(entity => {
+            entity.update(scene);
+        });
+    }
+
+    addLight(newLight) {
+
+        let light = newLight.type;
+        light.position.set(...newLight.pos);
+        this.scene.add(light);
+    }
+
+    addEntity(entity) {
+        this.entities.push(entity);
+        this.scene.add(entity.mesh);
+        let ent = this.entities[this.entities.length - 1];
+        let entInMesh = this.scene.children[this.scene.children.length - 1];
+        entInMesh.position.set(ent.pos.x, ent.pos.y, ent.pos.z);
+    }
+
+    update() {
+        this.controls.update();
+        this.updateEntities();
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = SceneManager;
+
+
+/***/ }),
+/* 6 */
 /***/ (function(module, exports) {
 
 module.exports = function( THREE ) {
@@ -47827,6 +47907,74 @@ module.exports = function( THREE ) {
 
 	return OrbitControls;
 };
+
+
+/***/ }),
+/* 7 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Vec3__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_three__ = __webpack_require__(0);
+
+
+
+class Entity {
+    constructor(entity) {
+        this.geometry = entity.geometry;
+        this.material = entity.material;
+        this.mesh = new __WEBPACK_IMPORTED_MODULE_1_three__["Mesh"](this.geometry, this.material);
+        this.traits = [];
+        this.pos = new __WEBPACK_IMPORTED_MODULE_0__Vec3__["a" /* default */]();
+        this.ID = this.mesh.uuid;
+    }
+
+    addTrait(trait) {
+        this.traits.push(trait);
+    }
+
+    set(x, y, z) {
+        this.pos.x = x;
+        this.pos.y = y;
+        this.pos.z = z;
+    }
+
+    update(scene) {
+        let meshChildren = scene.children;
+        meshChildren.forEach(meshChild => {
+            if (this.ID === meshChild.uuid) {
+                this.traits.forEach(trait => {
+                    trait(meshChild);
+                });
+                meshChild.position.set(this.pos.x, this.pos.y, this.pos.z);
+            }
+        });
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Entity;
+
+
+/***/ }),
+/* 8 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+class Vec3 {
+    constructor() {
+        this.x;
+        this.y;
+        this.z;
+
+        this.set(0, 0, 0);
+    }
+
+    set(x, y, z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Vec3;
 
 
 /***/ })

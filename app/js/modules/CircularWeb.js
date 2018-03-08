@@ -1,7 +1,6 @@
 import Delaunay from './Delaunay.js'
 import {Noise} from 'noisejs'
-let delaunay = new Delaunay() //varför funkar
-
+let del = new Delaunay() //varför funkar
 
 export default class CircularWeb {
     constructor(points, canvas){
@@ -11,6 +10,7 @@ export default class CircularWeb {
         this.y
         this.triangles1D
         this.triangles = []
+        // console.log(Delaunay)
 
         this.createTriangles(canvas)
         this.draw(canvas)
@@ -30,7 +30,7 @@ export default class CircularWeb {
         }
 
 
-        this.triangles1D = delaunay.triangulate(this.vertices)
+        this.triangles1D = del.triangulate(this.vertices)
     }
 
     draw(canvas){

@@ -1,9 +1,9 @@
 import CircularWeb from './modules/CircularWeb.js'
+import SceneManager from './modules/SceneManager.js'
+import Entity from './modules/Entity.js'
 import * as THREE from 'three'
-// import OrbitControls from 'three-orbit-controls'
 import {Noise} from 'noisejs'
 
-THREE.OrbitControls = require('three-orbit-controls')(THREE)
 let canvas1 = document.getElementById('canvas1')
 let canvas2 = document.getElementById('canvas2')
 
@@ -11,52 +11,106 @@ var noise = new Noise(Math.random())
 let circularWeb = new CircularWeb(25, canvas2)
 
 
-class SceneManager {
-    constructor(){
 
-        this.scene = new THREE.Scene()
-        this.camera = new THREE.PerspectiveCamera(35, window.innerWidth/window.innerHeight, 0.1, 3000)
+let master = new SceneManager()
+master.camera.position.z = 20
 
-        this.controls = new THREE.OrbitControls( this.camera )
-        this.renderer = new THREE.WebGLRenderer({canvas: canvas1, anitalias: true})
+let light1 = {
+    type: new THREE.AmbientLight( 0x888888),
+    pos: [50,50,50]
+}
+master.addLight(light1)
 
-        this.update()
-    }
+let light2 = {
+    type: new THREE.PointLight( 0xffffff, 1, 100 ),
+    pos: [50,50,50]
+}
+master.addLight(light2)
 
-    update(){
-        // camera.position.set( 0, 20, 100 );
-        this.controls.update()
-        // requestAnimationFrame(this.update())
-        this.renderer.render(this.scene, this.camera)
-    }
+
+
+
+
+function render() {
+    requestAnimationFrame(render)
+    master.update()
+}
+render()
+
+
+//first box
+
+
+let entity = {
+    geometry: new THREE.BoxGeometry(1,1,2),
+    material: new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff})
 }
 
-let scene = new SceneManager()
+let boxSpin = new Entity(entity)
+
+boxSpin.addTrait((mesh)=>{
+    mesh.rotation.x += 0.01
+    mesh.rotation.y += 0.001
+})
+
+master.addEntity(boxSpin)
+master.update()
 
 
-// function makeTriangle(tri){
-//     var off = -500
-//     var meshMaterial = new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff});
 
-//     var geom = new THREE.Geometry(); 
-//     var v1 = new THREE.Vector3(tri[0].x + off,tri[0].y + off, tri[0].z);
-//     var v2 = new THREE.Vector3(tri[1].x + off,tri[1].y + off, tri[1].z);
-//     var v3 = new THREE.Vector3(tri[2].x + off,tri[2].y + off, tri[2].z);
+//second box
+
+let entity2 = {
+    geometry: new THREE.BoxGeometry(2,1,2),
+    material: new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff})
+}
+
+let boxSpin2 = new Entity(entity2)
+
+boxSpin2.addTrait((mesh)=>{
+    mesh.rotation.x += 0.02    
+    mesh.rotation.y += 0.001
+})
+boxSpin2.set(3, 0, 0)
+master.addEntity(boxSpin2)
 
 
-//     geom.vertices.push(v1);
-//     geom.vertices.push(v2);
-//     geom.vertices.push(v3);
+
+function makeTriangle(tri){
+    var off = -500
+    var meshMaterial = new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff});
+
+    var geom = new THREE.Geometry(); 
+    var v1 = new THREE.Vector3(tri[0].x + off,tri[0].y + off, tri[0].z);
+    var v2 = new THREE.Vector3(tri[1].x + off,tri[1].y + off, tri[1].z);
+    var v3 = new THREE.Vector3(tri[2].x + off,tri[2].y + off, tri[2].z);
 
 
-//     geom.faces.push( new THREE.Face3( 0, 1, 2 ) );
+    geom.vertices.push(v1);
+    geom.vertices.push(v2);
+    geom.vertices.push(v3);
 
 
-//     var object = new THREE.Mesh( geom, meshMaterial);
-//     object.doubleSided = true;
-//     scene.add(object);
-// }
+    geom.faces.push( new THREE.Face3( 0, 1, 2 ) );
 
+
+    var object = new THREE.Mesh( geom, meshMaterial);
+    object.doubleSided = true;
+    scene.add(object);
+
+
+    let entityBufferSettings = {
+        geometry: geom,
+        material: meshMaterial
+    }
+
+    let entBuffer = new Entity(entityBufferSettings)
+
+    master.addEntity(entBuffer)
+
+}
+
+//     makeTriangle(tri)
 
 // triangles.forEach(tri => {
 //     makeTriangle(tri)
@@ -130,17 +184,3 @@ let scene = new SceneManager()
 
 
 
-var light1 = new THREE.AmbientLight( 0x888888 )
-scene.scene.add( light1 )
-
-var light2 = new THREE.PointLight( 0xffffff, 1, 100 )
-light2.position.set( 50, 50, 50 )
-scene.scene.add( light2 )
-
-scene.camera.position.z = 300
-
-var geometry = new THREE.BoxGeometry(1,1,2)
-var material = new THREE.MeshLambertMaterial({color: Math.random() * 0xffffff})
-var cube = new THREE.Mesh(geometry, material)
-scene.scene.add(cube)
-scene.update()
