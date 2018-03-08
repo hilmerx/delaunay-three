@@ -1,7 +1,7 @@
 import {loadScene} from './modules/Loaders.js'
 
 //mängden punkter som skapar trianglar
-let vertices = 74
+let vertices = 300
 
 Promise.all([
     loadScene(vertices)

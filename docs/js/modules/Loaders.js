@@ -47,10 +47,16 @@ export function loadScene(verts){
 
     master.entities.forEach(mesh=>{
         let tri = mesh.mesh.geometry.vertices
+
         let div = 200
-        let height = 200
+        let height = 100
+
+        let div2 = 500
+        let height2 = 100
+
         tri.forEach(v=>{
             v.z = noise.perlin2(v.x / div, v.y / div) * height
+            v.z = v.z + noise.perlin2(v.x / div2, v.y / div2) * height2
         })
     })
 

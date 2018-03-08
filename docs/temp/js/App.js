@@ -46348,7 +46348,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 
 
 //mängden punkter som skapar trianglar
-let vertices = 74;
+let vertices = 300;
 
 Promise.all([Object(__WEBPACK_IMPORTED_MODULE_0__modules_Loaders_js__["a" /* loadScene */])(vertices)]).then(([master]) => {
 
@@ -46415,10 +46415,16 @@ function loadScene(verts) {
 
     master.entities.forEach(mesh => {
         let tri = mesh.mesh.geometry.vertices;
+
         let div = 200;
-        let height = 200;
+        let height = 100;
+
+        let div2 = 500;
+        let height2 = 100;
+
         tri.forEach(v => {
             v.z = noise.perlin2(v.x / div, v.y / div) * height;
+            v.z = v.z + noise.perlin2(v.x / div2, v.y / div2) * height2;
         });
     });
 
